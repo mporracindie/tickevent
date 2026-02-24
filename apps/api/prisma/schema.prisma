@@ -6,17 +6,38 @@ datasource db {
   provider = "sqlite"
 }
 
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users  UserTenant[]
+  events Event[]
+}
+
 model User {
   id           String    @id @default(uuid())
   email        String    @unique
   passwordHash String?
   name         String?
-  role         Role      @default(ORGANIZER)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  
-  events       Event[]
-  sales        Sale[]
+
+  userTenants UserTenant[]
+  events      Event[]    @relation("EventCreator")
+  sales       Sale[]
+}
+
+model UserTenant {
+  userId   String
+  tenantId String
+  role     Role
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([userId, tenantId])
 }
 
 enum Role {
@@ -28,19 +49,21 @@ enum Role {
 }
 
 model Event {
-  id          String       @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   description String?
   date        DateTime
   venue       String
   imageUrl    String?
-  isPublished Boolean      @default(false)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  
-  organizerId String
-  organizer   User         @relation(fields: [organizerId], references: [id])
-  
+  isPublished Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creatorId   String?
+  creator     User?     @relation("EventCreator", fields: [creatorId], references: [id])
+
   ticketTypes TicketType[]
   sales       Sale[]
 }
@@ -54,23 +77,24 @@ model TicketType {
   sold        Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   eventId String
   event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  
+
   tickets Ticket[]
 }
 
 model Ticket {
-  id            String        @id @default(uuid())
-  code          String        @unique
-  status        TicketStatus @default(VALID)
-  checkedAt     DateTime?
-  createdAt     DateTime      @default(now())
-  
+  id         String        @id @default(uuid())
+  code       String        @unique
+  status     TicketStatus  @default(VALID)
+  checkedAt  DateTime?
+  checkedBy  String?       // userId de quien verificó
+  createdAt  DateTime      @default(now())
+
   ticketTypeId String
-  ticketType   TicketType    @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
-  
+  ticketType   TicketType  @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+
   saleId String?
   sale   Sale?   @relation(fields: [saleId], references: [id])
 }
@@ -83,21 +107,22 @@ enum TicketStatus {
 }
 
 model Sale {
-  id                String    @id @default(uuid())
+  id                String     @id @default(uuid())
   total             Float
   status            SaleStatus @default(PENDING)
   customerEmail     String?
   customerName      String?
   paymentReference  String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  eventId     String
-  event       Event   @relation(fields: [eventId], references: [id])
-  sellerId    String?
-  seller      User?   @relation(fields: [sellerId], references: [id])
-  
-  tickets     Ticket[]
+  guestToken        String?    // token para guest checkout
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  eventId  String
+  event    Event  @relation(fields: [eventId], references: [id])
+  sellerId String?
+  seller   User?  @relation(fields: [sellerId], references: [id])
+
+  tickets Ticket[]
 }
 
 enum SaleStatus {
