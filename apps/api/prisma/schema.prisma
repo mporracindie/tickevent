@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String?
+  name         String?
+  role         Role      @default(ORGANIZER)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  events       Event[]
+  sales        Sale[]
+}
+
+enum Role {
+  ADMIN
+  ORGANIZER
+  SELLER
+  VERIFIER
+  GUEST
+}
+
+model Event {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  date        DateTime
+  venue       String
+  imageUrl    String?
+  isPublished Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  organizerId String
+  organizer   User         @relation(fields: [organizerId], references: [id])
+  
+  ticketTypes TicketType[]
+  sales       Sale[]
+}
+
+model TicketType {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  quantity    Int
+  sold        Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  eventId String
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  tickets Ticket[]
+}
+
+model Ticket {
+  id            String        @id @default(uuid())
+  code          String        @unique
+  status        TicketStatus @default(VALID)
+  checkedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  
+  ticketTypeId String
+  ticketType   TicketType    @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  
+  saleId String?
+  sale   Sale?   @relation(fields: [saleId], references: [id])
+}
+
+enum TicketStatus {
+  VALID
+  USED
+  CANCELLED
+  REFUNDED
+}
+
+model Sale {
+  id                String    @id @default(uuid())
+  total             Float
+  status            SaleStatus @default(PENDING)
+  customerEmail     String?
+  customerName      String?
+  paymentReference  String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  eventId     String
+  event       Event   @relation(fields: [eventId], references: [id])
+  sellerId    String?
+  seller      User?   @relation(fields: [sellerId], references: [id])
+  
+  tickets     Ticket[]
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
